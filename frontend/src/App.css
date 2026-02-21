@@ -1,0 +1,66 @@
+.app {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+:root {
+  --bg: #0f0f12;
+  --bg-subtle: #1a1a1f;
+  --fg: #e8e6e3;
+  --muted: #8b8b8b;
+  --border: #2d2d33;
+  --primary: #6b8cce;
+  --error: #e05d5d;
+  --error-bg: rgba(224, 93, 93, 0.1);
+  --warning-bg: rgba(220, 180, 80, 0.12);
+  --warning-fg: #d4b850;
+  --warning-border: rgba(212, 184, 80, 0.4);
+}
+
+button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-subtle);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #25252b;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  padding: 0.4rem 0;
+}
+
+.btn-ghost:hover {
+  color: var(--fg);
+}

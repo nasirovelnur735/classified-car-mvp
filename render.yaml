@@ -1,0 +1,15 @@
+# Render Blueprint — деплой backend
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: classified-car-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false  # задать вручную в панели Render
+      - key: OPENAI_MODEL
+        value: gpt-4.1
+      - key: OPENAI_IMAGE_MODEL
+        value: gpt-image-1

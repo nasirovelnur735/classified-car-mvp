@@ -1,0 +1,62 @@
+.upload-screen {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.upload-screen h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.upload-screen .subtitle {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.dropzone:hover,
+.dropzone.drag-over {
+  border-color: var(--primary);
+  background: var(--bg-subtle);
+}
+
+.dropzone.has-files {
+  border-style: solid;
+  border-color: var(--primary);
+}
+
+.dropzone-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-screen .error-msg {
+  color: var(--error);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.upload-screen .btn-primary {
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.upload-screen .loading-hint {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
