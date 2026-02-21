@@ -4,17 +4,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Системные зависимости для CatBoost и др.
+# Системные зависимости для CatBoost, scikit-learn
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Устанавливаем CatBoost и scikit-learn отдельно (часто виновники ошибок сборки)
+RUN pip install --no-cache-dir numpy && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Railway и Render передают PORT — приложение должно слушать его
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
