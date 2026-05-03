@@ -411,8 +411,7 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
 
   const modelOptions = carIdentity.brand ? (modelsByBrand[carIdentity.brand] || []) : [];
   const brandOptions = brands.length > 0 ? brands : [];
-  const hasBrandInList = !carIdentity.brand || brandOptions.includes(carIdentity.brand);
-  const hasModelInList = !carIdentity.model || (carIdentity.brand && (modelsByBrand[carIdentity.brand] || []).includes(carIdentity.model));
+ 
 
   const aiSummary = useMemo(() => {
     const filledCount = REQUIRED_PRICING_FIELDS.filter((k) => {

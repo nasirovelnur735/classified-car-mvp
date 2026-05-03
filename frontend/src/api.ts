@@ -15,10 +15,20 @@ export interface AugmentImageResult {
   mode?: string;
 }
 
+function getAnalyzeError(res: Response, body: unknown): string {
+  if (res.status === 404) {
+    const base = import.meta.env.VITE_API_URL || "текущий хост";
+    return `Backend не найден (404). Запрос ушёл на: ${base || "(proxy)"}. Запустите backend (uvicorn на порту 8000) или задайте VITE_API_URL для облачного backend.`;
+  }
+  const err = body as { detail?: string };
+  return typeof err?.detail === "string" ? err.detail : res.statusText || "Ошибка анализа";
+}
+
 export async function analyzeImages(files: File[]): Promise<AnalysisResponse> {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
-  const res = await fetch(`${API_BASE}/api/analyze`, {
+  const url = `${API_BASE}/api/analyze`;
+  const res = await fetch(url, {
     method: "POST",
     body: form,
   });
@@ -26,11 +36,10 @@ export async function analyzeImages(files: File[]): Promise<AnalysisResponse> {
   try {
     body = await res.json();
   } catch {
-    throw new Error(res.ok ? "Неверный формат ответа сервера" : res.statusText || "Ошибка анализа");
+    throw new Error(res.ok ? "Неверный формат ответа сервера" : getAnalyzeError(res, null));
   }
   if (!res.ok) {
-    const err = body as { detail?: string };
-    throw new Error(typeof err?.detail === "string" ? err.detail : res.statusText || "Ошибка анализа");
+    throw new Error(getAnalyzeError(res, body));
   }
   if (body == null || typeof body !== "object") {
     throw new Error("Пустой ответ сервера");
