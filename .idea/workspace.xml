@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="e1a38af4-b332-4e31-94af-7e5ed7eda00a" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/agents/classification.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/agents/classification.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/agents/client.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/agents/client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/orchestrator.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/orchestrator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/catboost_info/catboost_training.json" beforeDir="false" afterPath="$PROJECT_DIR$/backend/catboost_info/catboost_training.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/catboost_info/learn/events.out.tfevents" beforeDir="false" afterPath="$PROJECT_DIR$/backend/catboost_info/learn/events.out.tfevents" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/catboost_info/learn_error.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/backend/catboost_info/learn_error.tsv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/catboost_info/time_left.tsv" beforeDir="false" afterPath="$PROJECT_DIR$/backend/catboost_info/time_left.tsv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 1
+}]]></component>
+  <component name="ProjectId" id="3B7qh77n6ItXuFTv4oP8P7iDuBD" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "C:/Users/nasir/Desktop/project"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-f2b7a9f6281b-6e1f45a539f7-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.29346.142" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="e1a38af4-b332-4e31-94af-7e5ed7eda00a" name="Changes" comment="" />
+      <created>1773850575675</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1773850575675</updated>
+    </task>
+    <servers />
+  </component>
+</project>

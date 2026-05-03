@@ -14,8 +14,8 @@
 - Node.js 18+
 - Переменная окружения **`OPENAI_API_KEY`** (обязательна).
 - Модели: по умолчанию **gpt-5.1** для всех агентов (инспекция, классификация, цена, описание); только агент преобразования изображений использует **gpt-image-1**. При необходимости можно переопределить через `OPENAI_MODEL` и `OPENAI_IMAGE_MODEL`.
-- **Доступ к API OpenAI:** если в вашем регионе доступ к OpenAI ограничен, запускайте **VPN** (например, сервер в США или ЕС) до старта backend — иначе возможны ошибки «Connection error» при анализе фото и генерации описания.
-- **Если при включённом VPN перестаёт открываться сайт (localhost):** многие VPN отправляют весь трафик в туннель, в том числе на localhost. Варианты: (1) В настройках VPN включите **split tunnel** / «Исключить локальные адреса» / «Не использовать VPN для локальной сети», чтобы трафик на 127.0.0.1 и локальную сеть шёл мимо VPN. (2) Фронт уже настроен на обращение к backend по `127.0.0.1:8000` — после перезапуска `npm run dev` попробуйте снова; если не поможет, настройте исключение локальных адресов в VPN.
+- **Доступ к API:** (1) **NeuroAPI** (без VPN): задайте **`NEUROAPI_API_KEY`** — проект автоматически использует https://neuroapi.host (OpenAI-совместимый API). (2) **OpenAI напрямую:** задайте **`OPENAI_API_KEY`**; при ограничениях по региону может потребоваться VPN.
+- **Если при включённом VPN перестаёт открываться сайт (localhost):** в настройках VPN включите split tunnel / «Исключить локальные адреса», чтобы трафик на 127.0.0.1 шёл мимо VPN.
 
 ---
 
@@ -39,12 +39,20 @@ set PYTHONPATH=.
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell) — OpenAI:**
 ```powershell
 $env:OPENAI_API_KEY="sk-proj-ваш-ключ"
 $env:PYTHONPATH="."
 uvicorn app.main:app --reload --port 8000
 ```
+
+**Windows (PowerShell) — NeuroAPI (без VPN):**
+```powershell
+$env:NEUROAPI_API_KEY="ваш-ключ-из-дашборда-neuroapi"
+$env:PYTHONPATH="."
+uvicorn app.main:app --reload --port 8000
+```
+При необходимости задайте модели, например: `$env:OPENAI_MODEL="gpt-4o"` и `$env:OPENAI_IMAGE_MODEL="gpt-image-1"`.
 
 **Linux / macOS:**
 ```bash
