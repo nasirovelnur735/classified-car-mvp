@@ -81,7 +81,7 @@ def _confidence_warnings(
     warnings = []
     try:
         conf = classification.get("classification_confidence") or {}
-        if isinstance(conf, dict) and (conf.get("category") == "low" or conf.get("subcategory") == "low"):
+        if isinstance(conf, dict) and (conf.get("category") == "low" or conf.get("body_type") == "low"):
             warnings.append(
                 ConfidenceWarning(field="model", confidence="low", reason="Низкая уверенность визуальной классификации")
             )

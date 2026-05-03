@@ -26,8 +26,6 @@ CLASSIFICATION_PROMPT = """
 
 category — основную категорию транспортного средства (например, "Легковой автомобиль", "Мотоцикл", "Коммерческий автомобиль"), если это возможно без предположений;
 
-subcategory — подкатегорию (например, "Седан", "Внедорожник", "Хэтчбек", "Кроссовер"), если визуальные признаки однозначны;
-
 item_type — тип кузова или общую конструктивную форму, основанную ТОЛЬКО на визуально наблюдаемых признаках;
 
 body_type — тип кузова на основе стандартной классификации (например, "Седан", "Хэтчбек", "Универсал", "Купе", "Внедорожник", "Пикап");
@@ -155,8 +153,6 @@ brand_visibility может принимать ТОЛЬКО одно из зна
 
 Определи category ("Легковой автомобиль", "Мотоцикл" и т.д.), если это возможно без предположений.
 
-Определи subcategory ("Седан", "Внедорожник") ТОЛЬКО при наличии однозначных признаков.
-
 Определи item_type ТОЛЬКО как визуально нейтральное описание формы кузова.
 
 Определи body_type на основе стандартной классификации.
@@ -190,7 +186,6 @@ brand_visibility может принимать ТОЛЬКО одно из зна
 "status": "success | partial | failed",
 
 "category": null,
-"subcategory": null,
 "item_type": null,
 "body_type": null,
 "color": null,
@@ -203,7 +198,7 @@ brand_visibility может принимать ТОЛЬКО одно из зна
 
 "classification_confidence": {
 "category": "low | medium | high | none",
-"subcategory": "low | medium | high | none",
+"body_type": "low | medium | high | none",
 "item_type": "low | medium | high | none"
 },
 
@@ -225,19 +220,19 @@ brand_visibility может принимать ТОЛЬКО одно из зна
 
 • status = "success":
 — category заполнена;
-— subcategory, item_type, body_type, color, steering_wheel_position заполнены до максимально возможного уровня без предположений;
+— item_type, body_type, color, steering_wheel_position заполнены до максимально возможного уровня без предположений;
 — transmission заполнен ТОЛЬКО если виден рычаг/селектор;
 — brand заполнен ТОЛЬКО при brand_visibility = "clearly_visible";
 — failure_reason = null.
 
 • status = "partial":
 — category заполнена;
-— остальные поля (subcategory, item_type, body_type, color, transmission, steering_wheel_position, brand, model) = null, если их нельзя определить без предположений;
+— остальные поля (item_type, body_type, color, transmission, steering_wheel_position, brand, model) = null, если их нельзя определить без предположений;
 — classification_confidence для недоступных уровней = "none";
 — failure_reason = null.
 
 • status = "failed":
-— category, subcategory, item_type, body_type, color, transmission, steering_wheel_position, brand, model = null;
+— category, item_type, body_type, color, transmission, steering_wheel_position, brand, model = null;
 — brand_visibility = "not_visible";
 — classification_confidence для всех уровней = "none";
 — visual_basis = [];
@@ -300,7 +295,7 @@ def run_classification(images_base64: list[str]) -> dict:
             "model": None,
             "body_type": None,
             "color": None,
-            "classification_confidence": {"category": "none", "subcategory": "none", "item_type": "none"},
+            "classification_confidence": {"category": "none", "body_type": "none", "item_type": "none"},
             "failure_reason": str(e),
             "_error": str(e),
         }
@@ -313,7 +308,7 @@ def run_classification(images_base64: list[str]) -> dict:
             "model": None,
             "body_type": None,
             "color": None,
-            "classification_confidence": {"category": "none", "subcategory": "none", "item_type": "none"},
+            "classification_confidence": {"category": "none", "body_type": "none", "item_type": "none"},
             "failure_reason": str(e),
             "_parse_error": str(e),
         }
