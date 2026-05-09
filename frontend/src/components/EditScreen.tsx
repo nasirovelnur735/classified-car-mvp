@@ -187,13 +187,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
   const [primaryDescription, setPrimaryDescription] = useState(() => (data?.generated_description != null ? String(data.generated_description) : ""));
   const [secondaryDescription, setSecondaryDescription] = useState("");
   const [userNotes, setUserNotes] = useState("");
-  const [userFields, setUserFields] = useState({
-    owners_count: "",
-    original_paint: "",
-    dealer_service: "",
-    extra_tires: "",
-    no_accidents_note: "",
-  });
+  const [latestVisionResult, setLatestVisionResult] = useState<Record<string, unknown>>(() => data?.vision_result ?? {});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [needReanalysis, setNeedReanalysis] = useState(false);
@@ -296,6 +290,10 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
     setUserEdited((prev) => new Set(prev).add(field));
   }, []);
 
+  useEffect(() => {
+    setLatestVisionResult(data?.vision_result ?? {});
+  }, [data?.vision_result]);
+
   const handleCarIdentityChange = useCallback(
     (field: keyof CarIdentity, value: string | number | null) => {
       setCarIdentity((prev) => {
@@ -336,7 +334,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
       const b64 = await Promise.all(files.slice(0, 5).map(fileToBase64));
       const result = await regenerateDescription({
         car_identity: carIdentity,
-        vision_result: data?.vision_result ?? {},
+        vision_result: latestVisionResult,
         extra_params: {},
         user_fields: {},
         user_notes: "",
@@ -348,20 +346,17 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
     } finally {
       setDescLoading(false);
     }
-  }, [carIdentity, data?.vision_result, files, markEdited]);
+  }, [carIdentity, latestVisionResult, files, markEdited]);
 
   const handleGenerateSecondaryDesc = useCallback(async () => {
     setSecondaryDescLoading(true);
     try {
       const b64 = await Promise.all(files.slice(0, 5).map(fileToBase64));
-      const filteredUserFields = Object.fromEntries(
-        Object.entries(userFields).filter(([, value]) => String(value || "").trim() !== "")
-      );
       const result = await regenerateDescription({
         car_identity: carIdentity,
-        vision_result: data?.vision_result ?? {},
+        vision_result: latestVisionResult,
         extra_params: {},
-        user_fields: filteredUserFields,
+        user_fields: {},
         user_notes: userNotes.trim(),
         description_type: "secondary",
         images_base64: b64,
@@ -371,7 +366,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
     } finally {
       setSecondaryDescLoading(false);
     }
-  }, [carIdentity, data?.vision_result, files, userFields, userNotes, markEdited]);
+  }, [carIdentity, latestVisionResult, files, userNotes, markEdited]);
 
   const handleAugment = useCallback(async () => {
     const file = augmentSelectedIndex != null && files[augmentSelectedIndex] ? files[augmentSelectedIndex] : augmentFile;
@@ -396,24 +391,30 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
   const augmentSourceFile =
     augmentSelectedIndex != null && files[augmentSelectedIndex] ? files[augmentSelectedIndex] : augmentFile;
 
-  const handleGetRecommendations = useCallback(async () => {
+  useEffect(() => {
     if (files.length === 0) {
+      setRecResult(null);
       setRecError("Добавьте хотя бы одно фото.");
       return;
     }
+    let cancelled = false;
     setRecLoading(true);
     setRecError(null);
-    setRecResult(null);
-    try {
-      const b64 = await Promise.all(files.slice(0, 20).map(fileToBase64));
-      const carContext = [carIdentity.brand, carIdentity.model].filter(Boolean).join(" ") || undefined;
-      const result = await getPhotoRecommendations(b64, carContext);
-      setRecResult(result);
-    } catch (e) {
-      setRecError(e instanceof Error ? e.message : "Ошибка получения рекомендаций");
-    } finally {
-      setRecLoading(false);
-    }
+    (async () => {
+      try {
+        const b64 = await Promise.all(files.slice(0, 20).map(fileToBase64));
+        const carContext = [carIdentity.brand, carIdentity.model].filter(Boolean).join(" ") || undefined;
+        const result = await getPhotoRecommendations(b64, carContext);
+        if (!cancelled) setRecResult(result);
+      } catch (e) {
+        if (!cancelled) setRecError(e instanceof Error ? e.message : "Ошибка получения рекомендаций");
+      } finally {
+        if (!cancelled) setRecLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [files, carIdentity.brand, carIdentity.model]);
 
   const handleRemovePhoto = useCallback(
@@ -426,28 +427,12 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
     [files, setFiles]
   );
 
-  const handleAddPhotos = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const added = e.target.files;
-      if (!added?.length) return;
-      const newFiles = Array.from(added).filter((f) => f.type.startsWith("image/"));
-      if (newFiles.length) {
-        setFiles([...files, ...newFiles]);
-        setRecResult(null);
-        setRecError(null);
-        setNeedReanalysis(true);
-      }
-      e.target.value = "";
-    },
-    [files, setFiles]
-  );
-
-  const handleReanalyzeAllPhotos = useCallback(async () => {
-    if (!files.length) return;
+  const runReanalysis = useCallback(async (targetFiles: File[]) => {
+    if (!targetFiles.length) return;
     setAnalysisLoading(true);
     setAnalysisError(null);
     try {
-      const result = await analyzeImages(files);
+      const result = await analyzeImages(targetFiles);
       const incomingIdentity = defaultCarIdentity(result.car_identity);
       setCarIdentity((prev) => {
         const merged: CarIdentity = { ...incomingIdentity };
@@ -462,14 +447,33 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
       setTechnicalAssumptions(result.technical_assumptions ?? defaultTechnicalAssumptions);
       setPriceEstimation(result.price_estimation ?? defaultPriceEstimation);
       setPrimaryDescription(result.generated_description ?? "");
+      setLatestVisionResult((result.vision_result as Record<string, unknown>) ?? {});
       setNeedReanalysis(false);
-      onReanalyzed(result, files);
+      onReanalyzed(result, targetFiles);
     } catch (e) {
       setAnalysisError(e instanceof Error ? e.message : "Ошибка повторного анализа");
     } finally {
       setAnalysisLoading(false);
     }
-  }, [files, onReanalyzed, userEdited]);
+  }, [onReanalyzed, userEdited]);
+
+  const handleAddPhotos = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const added = e.target.files;
+      if (!added?.length) return;
+      const newFiles = Array.from(added).filter((f) => f.type.startsWith("image/"));
+      if (newFiles.length) {
+        const nextFiles = [...files, ...newFiles];
+        setFiles(nextFiles);
+        setRecResult(null);
+        setRecError(null);
+        setNeedReanalysis(true);
+        void runReanalysis(nextFiles);
+      }
+      e.target.value = "";
+    },
+    [files, setFiles, runReanalysis]
+  );
 
   const warningsByField = (data?.confidence_warnings || []).reduce<Record<string, ConfidenceWarning>>((acc, w) => {
     acc[w.field] = w;
@@ -580,9 +584,10 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
       )}
       {needReanalysis && (
         <div className="banner needs-input">
-          Вы добавили новые фотографии. Для актуальных результатов запустите повторный анализ полного набора фото.
+          Вы добавили новые фотографии. Обновляем анализ по полному набору фото.
         </div>
       )}
+      {analysisLoading && <div className="banner needs-input">Проводится повторный анализ всех фотографий...</div>}
       {analysisError && <div className="banner error">{analysisError}</div>}
 
       <section className="block ai-summary-block">
@@ -728,7 +733,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
 
       <section className="block recommendations-block">
         <h2>Рекомендации по фото</h2>
-        <p className="hint">Добавьте или удалите фото, затем нажмите кнопку — ИИ подскажет, что улучшить или чего не хватает.</p>
+        <p className="hint">Рекомендации обновляются автоматически при изменении набора фотографий.</p>
         <div className="recommendations-row">
           <div className="rec-thumbnails-inline">
             {photoUrls.map((url, i) => (
@@ -744,25 +749,12 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
           <div className="rec-actions-inline">
             <input ref={addPhotoInputRef} type="file" accept="image/*" multiple onChange={handleAddPhotos} className="rec-file-input" aria-label="Добавить фото" />
             <button type="button" className="btn btn-secondary btn-small" onClick={() => addPhotoInputRef.current?.click()}>+ Добавить</button>
-            <button type="button" className="btn btn-primary" onClick={handleGetRecommendations} disabled={recLoading || files.length === 0}>
-              {recLoading ? "Анализ…" : "Рекомендации по фото"}
-            </button>
           </div>
-        </div>
-        <div className="recommendations-actions" style={{ marginBottom: "0.75rem" }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleReanalyzeAllPhotos}
-            disabled={analysisLoading || files.length === 0}
-          >
-            {analysisLoading ? "Повторный анализ..." : "Повторный анализ всех фото"}
-          </button>
         </div>
         {recLoading && (
           <div className="loading-inline">
             <span className="loading-spinner" aria-hidden />
-            <span>Анализируем фото…</span>
+            <span>Обновляем рекомендации по фото…</span>
           </div>
         )}
         {recError && <div className="banner error" role="alert">{recError}</div>}
@@ -1048,7 +1040,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
       </section>
 
       <section className="block description-block">
-        <h2>Описание (первичное / вторичное)</h2>
+        <h2>Описание</h2>
         {descLoading && (
           <div className="loading-inline">
             <span className="loading-spinner" aria-hidden />
@@ -1059,26 +1051,25 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
           <>
             <textarea
               className="description-textarea"
-              value={primaryDescription}
+              value={secondaryDescription || primaryDescription}
               onChange={(e) => {
-                setPrimaryDescription(e.target.value);
-                markEdited("primary_description");
+                if (secondaryDescription) {
+                  setSecondaryDescription(e.target.value);
+                  markEdited("secondary_description");
+                } else {
+                  setPrimaryDescription(e.target.value);
+                  markEdited("primary_description");
+                }
               }}
               rows={8}
-              placeholder="Первичное описание (автоматически сгенерированное)"
+              placeholder="Текст объявления"
             />
             <button type="button" className="btn btn-secondary" onClick={handleRegenerateDesc}>
               Перегенерировать первичное описание
             </button>
           </>
         )}
-        <div className="form-grid" style={{ marginTop: "1rem" }}>
-          <LabelInput label="Количество владельцев" value={userFields.owners_count} onChange={(v) => setUserFields((p) => ({ ...p, owners_count: v }))} />
-          <LabelInput label="Окрас" value={userFields.original_paint} onChange={(v) => setUserFields((p) => ({ ...p, original_paint: v }))} />
-          <LabelInput label="Обслуживание" value={userFields.dealer_service} onChange={(v) => setUserFields((p) => ({ ...p, dealer_service: v }))} />
-          <LabelInput label="Доп. комплект резины" value={userFields.extra_tires} onChange={(v) => setUserFields((p) => ({ ...p, extra_tires: v }))} />
-          <LabelInput label="ДТП (заметка)" value={userFields.no_accidents_note} onChange={(v) => setUserFields((p) => ({ ...p, no_accidents_note: v }))} />
-        </div>
+        <p className="hint" style={{ marginTop: "1rem" }}>Дополнительные заметки пользователя для генерации вторичного описания:</p>
         <textarea
           className="description-textarea"
           value={userNotes}
@@ -1089,17 +1080,6 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
         <button type="button" className="btn btn-secondary" onClick={handleGenerateSecondaryDesc} disabled={secondaryDescLoading}>
           {secondaryDescLoading ? "Генерация вторичного..." : "Сгенерировать вторичное описание"}
         </button>
-        <textarea
-          className="description-textarea"
-          value={secondaryDescription}
-          onChange={(e) => {
-            setSecondaryDescription(e.target.value);
-            markEdited("secondary_description");
-          }}
-          rows={8}
-          placeholder="Вторичное описание (после заполнения пользовательских полей)"
-          style={{ marginTop: "0.75rem" }}
-        />
       </section>
 
       <section className="block augment-block">
