@@ -6,6 +6,7 @@ from .description import run_description
 from .augmentation import run_augmentation
 from .recommender import run_photo_recommendations
 from .generations import get_generations
+from .consistency import run_consistency_check
 
 __all__ = [
     "run_vision",
@@ -15,4 +16,5 @@ __all__ = [
     "run_augmentation",
     "run_photo_recommendations",
     "get_generations",
+    "run_consistency_check",
 ]

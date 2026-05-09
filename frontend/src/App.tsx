@@ -46,13 +46,24 @@ function App() {
     setFiles([]);
   }, []);
 
+  const handleReanalyzed = useCallback((data: AnalysisResponse, currentFiles: File[]) => {
+    setResult(data);
+    setFiles(currentFiles);
+  }, []);
+
   return (
     <div className="app">
       {result == null ? (
         <UploadScreen onResult={handleResult} />
       ) : (
         <EditScreenErrorBoundary onBack={handleBack}>
-          <EditScreen data={result} files={files} setFiles={setFiles} onBack={handleBack} />
+          <EditScreen
+            data={result}
+            files={files}
+            setFiles={setFiles}
+            onBack={handleBack}
+            onReanalyzed={handleReanalyzed}
+          />
         </EditScreenErrorBoundary>
       )}
     </div>

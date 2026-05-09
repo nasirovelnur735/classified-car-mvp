@@ -94,6 +94,9 @@ async def regenerate_desc(body: RegenerateDescriptionBody):
         body.car_identity,
         body.vision_result,
         body.extra_params or {},
+        body.user_fields or {},
+        body.user_notes or "",
+        body.description_type or "primary",
     )
     return {"generated_description": text}
 

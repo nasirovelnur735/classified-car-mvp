@@ -79,6 +79,9 @@ export interface RegenerateDescriptionBody {
   car_identity: CarIdentity;
   vision_result: Record<string, unknown>;
   extra_params: Record<string, unknown>;
+  user_fields: Record<string, unknown>;
+  user_notes: string;
+  description_type: "primary" | "secondary";
   images_base64: string[];
 }
 

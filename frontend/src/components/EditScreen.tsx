@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
-import { recalculatePrice, regenerateDescription, augmentImage, getPhotoRecommendations, getGenerations } from "../api";
+import { analyzeImages, recalculatePrice, regenerateDescription, augmentImage, getPhotoRecommendations, getGenerations } from "../api";
 import type {
   AnalysisResponse,
   CarIdentity,
@@ -17,6 +17,7 @@ type Props = {
   files: File[];
   setFiles: (files: File[]) => void;
   onBack: () => void;
+  onReanalyzed: (data: AnalysisResponse, files: File[]) => void;
 };
 
 const DEFECT_SEVERITY_LABEL: Record<string, string> = {
@@ -171,9 +172,9 @@ const defaultPriceEstimation: PriceEstimation = {
   missing_fields: [],
 };
 
-export function EditScreen({ data, files, setFiles, onBack }: Props) {
+export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Props) {
   const [carIdentity, setCarIdentity] = useState<CarIdentity>(() => defaultCarIdentity(data?.car_identity));
-  const [visualCondition] = useState<VisualCondition>(() => {
+  const [visualCondition, setVisualCondition] = useState<VisualCondition>(() => {
     const v = data?.visual_condition;
     if (!v) return defaultVisualCondition;
     return {
@@ -183,11 +184,24 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
   });
   const [technicalAssumptions, setTechnicalAssumptions] = useState<TechnicalAssumptions>(() => data?.technical_assumptions ?? defaultTechnicalAssumptions);
   const [priceEstimation, setPriceEstimation] = useState<PriceEstimation>(() => data?.price_estimation ?? defaultPriceEstimation);
-  const [description, setDescription] = useState(() => (data?.generated_description != null ? String(data.generated_description) : ""));
+  const [primaryDescription, setPrimaryDescription] = useState(() => (data?.generated_description != null ? String(data.generated_description) : ""));
+  const [secondaryDescription, setSecondaryDescription] = useState("");
+  const [userNotes, setUserNotes] = useState("");
+  const [userFields, setUserFields] = useState({
+    owners_count: "",
+    original_paint: "",
+    dealer_service: "",
+    extra_tires: "",
+    no_accidents_note: "",
+  });
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [needReanalysis, setNeedReanalysis] = useState(false);
   const [userEdited, setUserEdited] = useState<UserEditedSet>(new Set<string>());
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [descLoading, setDescLoading] = useState(false);
+  const [secondaryDescLoading, setSecondaryDescLoading] = useState(false);
   const [augmentFile, setAugmentFile] = useState<File | null>(null);
   const [augmentSelectedIndex, setAugmentSelectedIndex] = useState<number | null>(null);
   const [augmentPrompt, setAugmentPrompt] = useState("");
@@ -324,14 +338,40 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
         car_identity: carIdentity,
         vision_result: data?.vision_result ?? {},
         extra_params: {},
+        user_fields: {},
+        user_notes: "",
+        description_type: "primary",
         images_base64: b64,
       });
-      setDescription(result.generated_description);
-      markEdited("generated_description");
+      setPrimaryDescription(result.generated_description);
+      markEdited("primary_description");
     } finally {
       setDescLoading(false);
     }
   }, [carIdentity, data?.vision_result, files, markEdited]);
+
+  const handleGenerateSecondaryDesc = useCallback(async () => {
+    setSecondaryDescLoading(true);
+    try {
+      const b64 = await Promise.all(files.slice(0, 5).map(fileToBase64));
+      const filteredUserFields = Object.fromEntries(
+        Object.entries(userFields).filter(([, value]) => String(value || "").trim() !== "")
+      );
+      const result = await regenerateDescription({
+        car_identity: carIdentity,
+        vision_result: data?.vision_result ?? {},
+        extra_params: {},
+        user_fields: filteredUserFields,
+        user_notes: userNotes.trim(),
+        description_type: "secondary",
+        images_base64: b64,
+      });
+      setSecondaryDescription(result.generated_description);
+      markEdited("secondary_description");
+    } finally {
+      setSecondaryDescLoading(false);
+    }
+  }, [carIdentity, data?.vision_result, files, userFields, userNotes, markEdited]);
 
   const handleAugment = useCallback(async () => {
     const file = augmentSelectedIndex != null && files[augmentSelectedIndex] ? files[augmentSelectedIndex] : augmentFile;
@@ -395,11 +435,41 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
         setFiles([...files, ...newFiles]);
         setRecResult(null);
         setRecError(null);
+        setNeedReanalysis(true);
       }
       e.target.value = "";
     },
     [files, setFiles]
   );
+
+  const handleReanalyzeAllPhotos = useCallback(async () => {
+    if (!files.length) return;
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+    try {
+      const result = await analyzeImages(files);
+      const incomingIdentity = defaultCarIdentity(result.car_identity);
+      setCarIdentity((prev) => {
+        const merged: CarIdentity = { ...incomingIdentity };
+        (Object.keys(incomingIdentity) as (keyof CarIdentity)[]).forEach((key) => {
+          if (userEdited.has(`car_identity.${key}`)) {
+            ((merged as unknown) as Record<string, unknown>)[key] = prev[key];
+          }
+        });
+        return merged;
+      });
+      setVisualCondition(result.visual_condition ?? defaultVisualCondition);
+      setTechnicalAssumptions(result.technical_assumptions ?? defaultTechnicalAssumptions);
+      setPriceEstimation(result.price_estimation ?? defaultPriceEstimation);
+      setPrimaryDescription(result.generated_description ?? "");
+      setNeedReanalysis(false);
+      onReanalyzed(result, files);
+    } catch (e) {
+      setAnalysisError(e instanceof Error ? e.message : "Ошибка повторного анализа");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, [files, onReanalyzed, userEdited]);
 
   const warningsByField = (data?.confidence_warnings || []).reduce<Record<string, ConfidenceWarning>>((acc, w) => {
     acc[w.field] = w;
@@ -425,10 +495,10 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
       priceEstimation.suggested_price != null
         ? `${priceEstimation.suggested_price.toLocaleString("ru-RU")} ₽${priceEstimation.mae != null ? ` ± ${Math.round(priceEstimation.mae).toLocaleString("ru-RU")} ₽` : ""}`
         : null;
-    const descTrim = description.trim();
+    const descTrim = (secondaryDescription.trim() || primaryDescription.trim());
     const descAfter = descTrim ? (descTrim.split(/\n\n+/).filter((p) => p.trim()).length || 1) : 0;
     return { filledCount, priceAfter, descAfter, descLen: descTrim.length };
-  }, [carIdentity, priceEstimation.suggested_price, priceEstimation.mae, description]);
+  }, [carIdentity, priceEstimation.suggested_price, priceEstimation.mae, primaryDescription, secondaryDescription]);
 
   const readiness = useMemo(
     () => ({
@@ -436,9 +506,9 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
       params: aiSummary.filledCount >= 11,
       condition: true,
       price: priceEstimation.suggested_price != null,
-      description: description.trim().length > 0,
+      description: (secondaryDescription.trim() || primaryDescription.trim()).length > 0,
     }),
-    [files.length, aiSummary.filledCount, priceEstimation.suggested_price, description]
+    [files.length, aiSummary.filledCount, priceEstimation.suggested_price, primaryDescription, secondaryDescription]
   );
   const readinessCount = [readiness.photos, readiness.params, readiness.condition, readiness.price, readiness.description].filter(Boolean).length;
 
@@ -500,12 +570,20 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
       )}
       {data?.status === "needs_user_input" && (
         <div className="banner needs-input">
-          Не удалось однозначно определить данные по фото. Проверьте и при необходимости введите марку, модель и год вручную.
+          {(data?.confidence_warnings || []).some((w) => (w.reason || "").toLowerCase().includes("одного автомобиля"))
+            ? "На фотографиях должны быть изображения одного автомобиля."
+            : "Не удалось однозначно определить данные по фото. Проверьте и при необходимости введите марку, модель и год вручную."}
         </div>
       )}
       {data?.status === "error" && (
         <div className="banner error">Произошла ошибка при анализе. Вы можете заполнить поля вручную.</div>
       )}
+      {needReanalysis && (
+        <div className="banner needs-input">
+          Вы добавили новые фотографии. Для актуальных результатов запустите повторный анализ полного набора фото.
+        </div>
+      )}
+      {analysisError && <div className="banner error">{analysisError}</div>}
 
       <section className="block ai-summary-block">
         <h2>Что сделал ИИ</h2>
@@ -638,10 +716,10 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
                 {priceEstimation.suggested_price.toLocaleString("ru-RU")} ₽
               </div>
             )}
-            {description.trim() && (
+            {(secondaryDescription.trim() || primaryDescription.trim()) && (
               <div className="ad-preview-desc">
-                {description.trim().slice(0, 200)}
-                {description.trim().length > 200 ? "…" : ""}
+                {(secondaryDescription.trim() || primaryDescription.trim()).slice(0, 200)}
+                {(secondaryDescription.trim() || primaryDescription.trim()).length > 200 ? "…" : ""}
               </div>
             )}
           </div>
@@ -670,6 +748,16 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
               {recLoading ? "Анализ…" : "Рекомендации по фото"}
             </button>
           </div>
+        </div>
+        <div className="recommendations-actions" style={{ marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleReanalyzeAllPhotos}
+            disabled={analysisLoading || files.length === 0}
+          >
+            {analysisLoading ? "Повторный анализ..." : "Повторный анализ всех фото"}
+          </button>
         </div>
         {recLoading && (
           <div className="loading-inline">
@@ -960,7 +1048,7 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
       </section>
 
       <section className="block description-block">
-        <h2>Описание</h2>
+        <h2>Описание (первичное / вторичное)</h2>
         {descLoading && (
           <div className="loading-inline">
             <span className="loading-spinner" aria-hidden />
@@ -971,19 +1059,47 @@ export function EditScreen({ data, files, setFiles, onBack }: Props) {
           <>
             <textarea
               className="description-textarea"
-              value={description}
+              value={primaryDescription}
               onChange={(e) => {
-                setDescription(e.target.value);
-                markEdited("generated_description");
+                setPrimaryDescription(e.target.value);
+                markEdited("primary_description");
               }}
               rows={8}
-              placeholder="Текст объявления"
+              placeholder="Первичное описание (автоматически сгенерированное)"
             />
             <button type="button" className="btn btn-secondary" onClick={handleRegenerateDesc}>
-              Перегенерировать описание
+              Перегенерировать первичное описание
             </button>
           </>
         )}
+        <div className="form-grid" style={{ marginTop: "1rem" }}>
+          <LabelInput label="Количество владельцев" value={userFields.owners_count} onChange={(v) => setUserFields((p) => ({ ...p, owners_count: v }))} />
+          <LabelInput label="Окрас" value={userFields.original_paint} onChange={(v) => setUserFields((p) => ({ ...p, original_paint: v }))} />
+          <LabelInput label="Обслуживание" value={userFields.dealer_service} onChange={(v) => setUserFields((p) => ({ ...p, dealer_service: v }))} />
+          <LabelInput label="Доп. комплект резины" value={userFields.extra_tires} onChange={(v) => setUserFields((p) => ({ ...p, extra_tires: v }))} />
+          <LabelInput label="ДТП (заметка)" value={userFields.no_accidents_note} onChange={(v) => setUserFields((p) => ({ ...p, no_accidents_note: v }))} />
+        </div>
+        <textarea
+          className="description-textarea"
+          value={userNotes}
+          onChange={(e) => setUserNotes(e.target.value)}
+          rows={4}
+          placeholder="Заметки пользователя (например: 1 владелец по ПТС, в родном окрасе, обслуживалась у дилера, есть зимняя резина, без ДТП)"
+        />
+        <button type="button" className="btn btn-secondary" onClick={handleGenerateSecondaryDesc} disabled={secondaryDescLoading}>
+          {secondaryDescLoading ? "Генерация вторичного..." : "Сгенерировать вторичное описание"}
+        </button>
+        <textarea
+          className="description-textarea"
+          value={secondaryDescription}
+          onChange={(e) => {
+            setSecondaryDescription(e.target.value);
+            markEdited("secondary_description");
+          }}
+          rows={8}
+          placeholder="Вторичное описание (после заполнения пользовательских полей)"
+          style={{ marginTop: "0.75rem" }}
+        />
       </section>
 
       <section className="block augment-block">

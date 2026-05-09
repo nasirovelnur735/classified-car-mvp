@@ -17,7 +17,32 @@ def run_description(
     classification_result: dict,
     vision_result: dict,
     df_for_pricing: dict,
+    user_fields: dict | None = None,
+    user_notes: str | None = None,
+    description_type: str = "primary",
 ) -> str:
+    user_fields = user_fields or {}
+    user_notes = (user_notes or "").strip()
+    description_type = "secondary" if description_type == "secondary" else "primary"
+
+    user_fields_non_empty = {
+        k: v for k, v in user_fields.items()
+        if v is not None and (not isinstance(v, str) or v.strip() != "")
+    }
+    user_block = ""
+    if description_type == "secondary":
+        user_block = f"""
+────────────────────
+ДОПОЛНИТЕЛЬНЫЕ ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ (ВТОРИЧНОЕ ОПИСАНИЕ)
+────────────────────
+- Используй пользовательские поля ТОЛЬКО если они заполнены.
+- Если поле пустое — не упоминай его в тексте.
+- Поле notes/user_notes — свободные заметки пользователя; используй только при наличии.
+- Не придумывай пользовательские данные.
+
+user_fields: {json.dumps(user_fields_non_empty, ensure_ascii=False)}
+user_notes: {json.dumps(user_notes, ensure_ascii=False)}
+"""
     prompt = f"""
 Ты — агент генерации продающих описаний
 для объявлений о продаже подержанных автомобилей.
@@ -38,6 +63,9 @@ def run_description(
 3. df_for_pricing — год, пробег, комплектация и доп. параметры
 
 Если данных не хватает в одном источнике — используй другой.
+
+ТИП ОПИСАНИЯ: {description_type}
+{"Для этого запроса нужно сформировать ПЕРВИЧНОЕ описание только на основе автоматически полученных данных." if description_type == "primary" else "Для этого запроса нужно сформировать ВТОРИЧНОЕ описание на основе автоматических данных и заполненных пользовательских полей."}
 
 ────────────────────
 ОБЯЗАТЕЛЬНЫЕ СМЫСЛОВЫЕ БЛОКИ
@@ -110,6 +138,7 @@ def run_description(
 classification_result: {json.dumps(classification_result, ensure_ascii=False)}
 vision_result: {json.dumps(vision_result, ensure_ascii=False)}
 df_for_pricing: {json.dumps(df_for_pricing, ensure_ascii=False)}
+{user_block}
 
 Сформируй продающее описание. Только текст, без заголовков.
 """

@@ -61,7 +61,6 @@ class AnalysisResponse(BaseModel):
     generated_description: str = ""
     confidence_warnings: list[ConfidenceWarning] = Field(default_factory=list)
     status: Literal["ok", "needs_user_input", "error"] = "ok"
-    # Для перегенерации описания и отображения ограничений (не затирается пользователем)
     vision_result: dict = Field(default_factory=dict)
 
 
@@ -75,6 +74,9 @@ class RegenerateDescriptionBody(BaseModel):
     car_identity: CarIdentity
     vision_result: dict = Field(default_factory=dict)
     extra_params: dict = Field(default_factory=dict)
+    user_fields: dict = Field(default_factory=dict)
+    user_notes: str = ""
+    description_type: Literal["primary", "secondary"] = "primary"
     images_base64: list[str] = Field(default_factory=list)
 
 

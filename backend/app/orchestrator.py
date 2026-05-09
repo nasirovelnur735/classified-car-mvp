@@ -19,7 +19,7 @@ from app.schemas import (
     SEVERITY_MAP,
     DEFECT_TYPE_MAP,
 )
-from agents import run_vision, run_classification, run_pricing, run_description
+from agents import run_vision, run_classification, run_pricing, run_description, run_consistency_check
 
 
 def _normalize_defect_type(t: str) -> str:
@@ -136,6 +136,26 @@ def analyze_images(images_bytes: List[bytes]) -> AnalysisResponse:
         b64 = base64.b64encode(raw).decode("utf-8")
         images_b64.append(b64)
 
+    # 0) Проверка: все фото должны быть одного автомобиля
+    consistency = run_consistency_check(images_b64)
+    if consistency.get("verdict") != "single_car":
+        reason = consistency.get("reason") or "На фотографиях должны быть изображения одного автомобиля."
+        return AnalysisResponse(
+            status="needs_user_input",
+            generated_description="",
+            confidence_warnings=[
+                ConfidenceWarning(
+                    field="images",
+                    confidence="low",
+                    reason=f"На фотографиях должны быть изображения одного автомобиля. {reason}",
+                )
+            ],
+            vision_result={
+                "raw_text_description": "Анализ невозможен: на фотографиях должны быть изображения одного автомобиля.",
+                "consistency_check": consistency,
+            },
+        )
+
     # 1) Параллельно: визуальная инспекция и классификация (сокращает время в ~2 раза)
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -223,7 +243,16 @@ def analyze_images(images_bytes: List[bytes]) -> AnalysisResponse:
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
             fut_price = executor.submit(_run_pricing)
-            fut_desc = executor.submit(run_description, images_b64, classification, vision, df_for_pricing)
+            fut_desc = executor.submit(
+                run_description,
+                images_b64,
+                classification,
+                vision,
+                df_for_pricing,
+                {},
+                "",
+                "primary",
+            )
             price_est = fut_price.result()
             generated_description = fut_desc.result()
     except Exception as e:
@@ -320,6 +349,9 @@ def regenerate_description(
     car_identity: CarIdentity,
     vision_result: dict,
     extra_params: dict,
+    user_fields: dict | None = None,
+    user_notes: str = "",
+    description_type: str = "primary",
 ) -> str:
     """Перегенерация описания с учётом текущих (возможно пользовательских) данных."""
     classification_result = {
@@ -337,4 +369,12 @@ def regenerate_description(
         "mileage": extra_params.get("mileage"),
         **extra_params,
     }
-    return run_description(images_base64, classification_result, vision_result, df_for_pricing)
+    return run_description(
+        images_base64,
+        classification_result,
+        vision_result,
+        df_for_pricing,
+        user_fields=user_fields or {},
+        user_notes=user_notes or "",
+        description_type=description_type,
+    )
