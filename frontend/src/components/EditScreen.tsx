@@ -127,6 +127,15 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function base64ToFile(base64: string, filename: string, mime = "image/png"): File {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], filename, { type: mime });
+}
+
 function getMissingPricingFields(car: CarIdentity, accidentSigns: boolean): string[] {
   const damage = accidentSigns ? "битый" : (car.damage_flag || "").trim();
   const missing: string[] = [];
@@ -211,6 +220,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
   const [recLoading, setRecLoading] = useState(false);
   const [recResult, setRecResult] = useState<PhotoRecommendationsResponse | null>(null);
   const [recError, setRecError] = useState<string | null>(null);
+  const [recCollapsed, setRecCollapsed] = useState(false);
   const [generationOptions, setGenerationOptions] = useState<string[]>([]);
   const [generationOptionsLoading, setGenerationOptionsLoading] = useState(false);
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -475,6 +485,21 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
     [files, setFiles, runReanalysis]
   );
 
+  const handleApplyAugmentToGallery = useCallback(async () => {
+    if (augmentSelectedIndex == null || !augmentResult.imageBase64 || !files[augmentSelectedIndex]) return;
+    const source = files[augmentSelectedIndex];
+    const ext = source.name.includes(".") ? source.name.split(".").pop() : "png";
+    const replaced = base64ToFile(
+      augmentResult.imageBase64,
+      `${source.name.replace(/\.[^.]+$/, "")}_edited.${ext}`,
+      source.type || "image/png"
+    );
+    const nextFiles = files.map((f, i) => (i === augmentSelectedIndex ? replaced : f));
+    setFiles(nextFiles);
+    setNeedReanalysis(true);
+    await runReanalysis(nextFiles);
+  }, [augmentSelectedIndex, augmentResult.imageBase64, files, setFiles, runReanalysis]);
+
   const warningsByField = (data?.confidence_warnings || []).reduce<Record<string, ConfidenceWarning>>((acc, w) => {
     acc[w.field] = w;
     return acc;
@@ -732,8 +757,19 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
       </section>
 
       <section className="block recommendations-block">
-        <h2>Рекомендации по фото</h2>
+        <div className="edit-header-row">
+          <h2>Рекомендации по фото</h2>
+          <button
+            type="button"
+            className="btn btn-small btn-ghost"
+            onClick={() => setRecCollapsed((prev) => !prev)}
+          >
+            {recCollapsed ? "Развернуть" : "Свернуть"}
+          </button>
+        </div>
         <p className="hint">Рекомендации обновляются автоматически при изменении набора фотографий.</p>
+        {!recCollapsed && (
+          <>
         <div className="recommendations-row">
           <div className="rec-thumbnails-inline">
             {photoUrls.map((url, i) => (
@@ -772,6 +808,8 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
               <div className="rec-list"><strong>Советы:</strong><ul>{recResult.recommendations.map((r, i) => <li key={i}>{r}</li>)}</ul></div>
             )}
           </div>
+        )}
+          </>
         )}
       </section>
 
@@ -1065,11 +1103,11 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
               placeholder="Текст объявления"
             />
             <button type="button" className="btn btn-secondary" onClick={handleRegenerateDesc}>
-              Перегенерировать первичное описание
+              Перегенерировать описание
             </button>
           </>
         )}
-        <p className="hint" style={{ marginTop: "1rem" }}>Дополнительные заметки пользователя для генерации вторичного описания:</p>
+        <p className="hint" style={{ marginTop: "1rem" }}>Заметки пользователя:</p>
         <textarea
           className="description-textarea"
           value={userNotes}
@@ -1078,7 +1116,7 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
           placeholder="Заметки пользователя (например: 1 владелец по ПТС, в родном окрасе, обслуживалась у дилера, есть зимняя резина, без ДТП)"
         />
         <button type="button" className="btn btn-secondary" onClick={handleGenerateSecondaryDesc} disabled={secondaryDescLoading}>
-          {secondaryDescLoading ? "Генерация вторичного..." : "Сгенерировать вторичное описание"}
+          {secondaryDescLoading ? "Генерация..." : "Сгенерировать описание по заметкам"}
         </button>
       </section>
 
@@ -1154,6 +1192,16 @@ export function EditScreen({ data, files, setFiles, onBack, onReanalyzed }: Prop
                 alt="Результат преобразования"
                 onError={() => setAugmentImageLoadError(true)}
               />
+            )}
+            {augmentSelectedIndex != null && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleApplyAugmentToGallery}
+                style={{ marginTop: "0.75rem" }}
+              >
+                Заменить исходное фото в галерее
+              </button>
             )}
           </div>
         )}
